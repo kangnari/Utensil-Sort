@@ -58,6 +58,7 @@ find_package(catkin REQUIRED COMPONENTS
    FILES
    ImuSrv.srv 
    NuSrv.srv
+   ImageSrv.srv
    )
 ## Generate actions in the 'action' folder
 # add_action_files(
