@@ -1,0 +1,7 @@
+set(_CATKIN_CURRENT_PACKAGE "service_example")
+set(service_example_MAINTAINER "ee106a-ta <ee106a-ta@todo.todo>")
+set(service_example_DEPRECATED "")
+set(service_example_VERSION "0.0.0")
+set(service_example_BUILD_DEPENDS "message_generation" "roscpp" "rospy" "std_msgs")
+set(service_example_RUN_DEPENDS "message_runtime" "roscpp" "rospy" "std_msgs")
+set(service_example_BUILDTOOL_DEPENDS "catkin")

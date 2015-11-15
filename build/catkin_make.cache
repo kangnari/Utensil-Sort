@@ -1,0 +1,2 @@
+kalman_zumy:service_example:zumy_teleop
+-DCATKIN_DEVEL_PREFIX=/home/cc/ee106a/fa15/class/ee106a-ck/ros_workspaces/project/devel -DCMAKE_INSTALL_PREFIX=/home/cc/ee106a/fa15/class/ee106a-ck/ros_workspaces/project/install -G Unix Makefiles

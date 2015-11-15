@@ -1,0 +1,7 @@
+set(_CATKIN_CURRENT_PACKAGE "kalman_zumy")
+set(kalman_zumy_MAINTAINER "ee106a-tb <ee106a-tb@todo.todo>")
+set(kalman_zumy_DEPRECATED "")
+set(kalman_zumy_VERSION "0.0.0")
+set(kalman_zumy_BUILD_DEPENDS "message_generation" "roscpp" "rospy" "std_msgs")
+set(kalman_zumy_RUN_DEPENDS "message_runtime" "roscpp" "rospy" "std_msgs")
+set(kalman_zumy_BUILDTOOL_DEPENDS "catkin")
