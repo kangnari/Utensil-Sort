@@ -20,7 +20,7 @@ class ImageProcess:
     """ Initializes the node.
     """
     def __init__(self):
-        # Init node
+        # Initialize the node
         rospy.init_node('image_process')
         # Create a CvBridge to convert ROS messages to OpenCV images
         self.bridge = CvBridge()
