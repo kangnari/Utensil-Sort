@@ -37,7 +37,9 @@ class MainControl:
         # Set the provided ar tags
         self.ar_tags = ar_tags
         # Set the current goal for the zumy
-        self.current_goal = "start"
+        self.current_goal = self.ar_tags["start"]
+        # Set the current path for the zumy
+        self.path = []
         # True if Zumy has arrived at the current goal
         self.at_goal = False
         # True if Zumy has finished sorting all utensils
@@ -54,46 +56,40 @@ class MainControl:
         omega, theta = eqf.quarternion_to_exp(rot)
         return eqf.create_rbt(omega, theta, trans)
 
-    """ Rotate the Zumy until it points towards the goal
-    AR tag. Once it has finished rotating, it should
-    actually begin moving towards the AR tag.
+    """ Given a path output from the path planning service node,
+    move the Zumy point by point until it has reached its current
+    goal.
     """
-    def pointToAR(self):
+    def moveToGoal(self):
         done = False
-        while not rospy.is_shutdown() and not done:
-            try:
-                ar_tags = self.ar_tags
-                zumy_tag = ar_tags["zumy"]
-                goal_tag = ar_tags[self.current_goal]
-                (trans, rot) = self.listener
-                                   .lookupTransform(zumy_tag,
-                                                    goal_tag,
-                                                    rospy.Time(0))
-            except:
-                continue
-            rbt = self.return_rbt(trans, rot)
-            yTrans = -1*rbt[0, 3]
-            # Check if the y translation is less than some
-            # threshold
-            if abs(yTrans <= 0.15):
-                done = True
-            else:
-                cmd = Twist()
-                cmd.linear.x = 0
-                cmd.linear.y = 0
-                cmd.linear.z = 0
-                cmd.angular.x = 0
-                cmd.angular.y = 0
-                cmd.angular.z = 0.2
-                self.zumy_vel.publish(cmd)
-            self.rate.sleep()
-        return
-
-    """ Move the Zumy towards the goal AR tag.
-    """
-    def moveToAR(self):
-        # Do shit
-        return
+        # while not rospy.is_shutdown() and not done:
+        #     try:
+        #         ar_tags = self.ar_tags
+        #         zumy_tag = ar_tags["zumy"]
+        #         goal_tag = ar_tags[self.current_goal]
+        #         (trans, rot) = self.listener
+        #                            .lookupTransform(zumy_tag,
+        #                                             goal_tag,
+        #                                             rospy.Time(0))
+        #     except:
+        #         continue
+        #     rbt = self.return_rbt(trans, rot)
+        #     yTrans = -1*rbt[0, 3]
+        #     # Check if the y translation is less than some
+        #     # threshold
+        #     if abs(yTrans <= 0.15):
+        #         done = True
+        #     else:
+        #         cmd = Twist()
+        #         cmd.linear.x = 0
+        #         cmd.linear.y = 0
+        #         cmd.linear.z = 0
+        #         cmd.angular.x = 0
+        #         cmd.angular.y = 0
+        #         cmd.angular.z = 0.2
+        #         self.zumy_vel.publish(cmd)
+        #     self.rate.sleep()
+        # return
 
     """ Main node execution function.
     """
@@ -101,16 +97,19 @@ class MainControl:
         # Set up a function to call the utensil detection service. The
         # service is set up in image_process.py and uses the UtensilSrv
         # service type.
-        rospy.wait_for_service("utensil_type")
-        utensil_type = rospy.ServiceProxy("utensil_type", UtensilSrv)
+        # rospy.wait_for_service("utensil_type")
+        # rospy.wait_for_service("path_planning")
+        # get_utensil_type = rospy.ServiceProxy("utensil_type", UtensilSrv)
+        # plan_path = rospy.ServiceProxy("", PathPlanSrv)
         while not rospy.is_shutdown() and not self.done:
             if self.at_goal:
-                if self.current_goal == "start"
+                if self.current_goal == self.ar_tags["start"]
                     # XXX FUNCTION HERE TO DROP UTENSIL
                     # Pause until the next utensil has dropped.
                     self.wait_rate.sleep()
                     # Get the type of the utensil.
-                    utensil = utensil_type().utensil_type
+                    # utensil = get_utensil_type().utensil_type
+                    utensil = raw_input('Input current goal for zumy:')
                     if utensil:
                         # Set the new goal for the Zumy.
                         self.current_goal = self.ar_tags[utensil]
@@ -120,11 +119,13 @@ class MainControl:
                 else:
                     # Zumy has just finished moving its utensil to
                     # the correct pile.
-                    self.current_goal = "start"
+                    self.current_goal = self.ar_tags["start"]
+                    # Set the path the Zumy should follow
+                    # self.path = plan_path(self.current_goal).path_points
             else:
                 # Zumy needs to move towards the goal
-                self.pointToAR()
-                self.moveToAR()
+                # Call path planning service
+                self.moveToGoal()
             self.rate.sleep()
 
 if __name__ == "__main__":
