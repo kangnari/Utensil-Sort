@@ -55,7 +55,7 @@ class ImageProcess:
         # Set up a function to call the image capture service. The
         # service is set up in camera_srv.py and uses the ImageSrv
         # service type.
-        last_image_service = rospy.ServiceProxy('last_image', ImageSrv)
+        last_image_service = rospy.ServiceProxy('last_image_utensil', ImageSrv)
 
         # Set last_image to the NumPy converted image
         self.last_image = self.ros_to_np_img(last_image_service().image_data)
@@ -96,7 +96,7 @@ class ImageProcess:
     def run(self):
         # Waits for the image service to become available.
         # This servie is set up in camera_srv.py.
-        rospy.wait_for_service('last_image')
+        rospy.wait_for_service('last_image_utensil')
 
         # Done with setup. Wait for utensil detection requests.
         rospy.spin()

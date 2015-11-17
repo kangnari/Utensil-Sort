@@ -25,7 +25,7 @@ class ImgService:
         rospy.Subscriber("/usb_cam_" + cam_name + "/image_raw", Image, self.imgReceived)
 
         #Create the service
-        rospy.Service('last_image', ImageSrv, self.getLastImage)
+        rospy.Service("last_image_" + cam_name, ImageSrv, self.getLastImage)
 
     #Callback for when an image is received
     def imgReceived(self, message):
