@@ -1,4 +1,3 @@
-string origin_ar
-string destination_ar
+string destination
 ---
 list path_points

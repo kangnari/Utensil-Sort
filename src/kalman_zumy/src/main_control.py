@@ -91,12 +91,12 @@ class MainControl:
             try:
                 # Get new angle of Zumy relative to start
                 new_angle = self.heading()
-                    if abs(current_angle-new_angle) > 85:
-                        done = True
-                    self.stop()
-                    else:
-                        self.zumy_vel.publish(cmd)
-                        self.rate.sleep()
+                if abs(current_angle-new_angle) > 85:
+                    done = True
+                self.stop()
+                else:
+                    self.zumy_vel.publish(cmd)
+                    self.rate.sleep()
             except KeyboardInterrupt:
                 break
         return
@@ -139,7 +139,7 @@ class MainControl:
             coor1 = self.xyPos()
             dist = np.sqrt((coor1[0]-coor0[0])**2 + (coor1[1]-coor0[1])**2)
             print dist
-            if (dist > amount):
+            if (dist > abs(amount)):
               done = True
               self.stop()
             else:
@@ -236,7 +236,7 @@ class MainControl:
                 # self.current_goal = self.ar_tags[utensil]
                 # Zumy needs to move towards the goal
                 # Set the path the Zumy should follow
-                # self.path = plan_path(self.origin, self.current_goal).path_points
+                # self.path = plan_path(self.current_goal).path_points
                 # self.moveToGoal()
                 # self.returnToStart()
             # else:
@@ -245,18 +245,15 @@ class MainControl:
             # self.rate.sleep()
 
 if __name__ == "__main__":
-    # if len(sys.argv) < 7:
-    #     print("Use: main_control.py [ zumy name ] [ AR zumy tag # ] [ AR start tag #] [ AR fork tag # ] [ AR knife tag # ] [ AR spoon tag # ]")
+    # if len(sys.argv) < 4:
+    #     print("Use: main_control.py [ zumy name ] [ AR zumy tag # ] [ AR start tag # ]")
     #     sys.exit()
     if len(sys.argv) < 4:
-        print("Use: main_control.py [ zumy name ] [ AR zumy tag # ] [ AR start tag #] ")
+        print("Use: main_control.py [ zumy name ] [ AR zumy tag # ] [ AR start tag # ] ")
         sys.exit()
     ar_tags = {}
     zumy_name = sys.argv[1]
     ar_tags["zumy"]  = "ar_marker_" + sys.argv[2]
     ar_tags["start"] = "ar_marker_" + sys.argv[3]
-    # ar_tags["fork"]  = "ar_marker_" + sys.argv[4]
-    # ar_tags["knife"] = "ar_marker_" + sys.argv[5]
-    # ar_tags["spoon"] = "ar_marker_" + sys.argv[6]
     node = MainControl(zumy_name, ar_tags)
     node.run()

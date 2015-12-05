@@ -45,5 +45,5 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         print("Use: camera_srv.py [ utensil/global ]")
         sys.exit()
-    node = ImgService(sys.argv[2])
+    node = ImgService(sys.argv[1])
     node.run()
