@@ -14,7 +14,7 @@ Setup steps
 (To look at camera output)
 5. rosrun image_view image_view image:=/usb_cam_[global/utensil]/image_raw
 
-(To open tf viewer)
+(To open tf viewer - keep in mind that the x-axis = red)
 6.rosrun rviz rviz
 
 7. Set up two camera services (camera_srv.py). Arguments: (utensil, global). The path planning node 
@@ -23,7 +23,15 @@ will use the image from camera_srv/usb_cam_global to do path planning to destina
   rosrun kalman_zumy camera_srv.py global
   rosrun kalman_zumy camera_srv.py utensil
 
-rosrun kalman_zumy main_control [AR zumy tag #] [AR start tag #] [AR fork tag #] [AR knife tag #] [AR spoon tag #]
+8. Set up the path planning service (path_planning_srv.py)
+
+  rosrun kalman_zumy path_planning_srv.py [x_length] [y_length] [# x points] [# y points] [debug? (optional)]
+
+9. Set up main node
+
+  rosrun kalman_zumy main_control [zumy name] [AR zumy tag #] [AR start tag #]
+
+
 
 TODO
 1. Change any references to usb_cam/... to usb_cam_utensil/... or usb_cam_global/...

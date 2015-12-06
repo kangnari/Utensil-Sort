@@ -61,7 +61,7 @@ class MainControl:
     def heading(self):
         zumy_tag = self.ar_tags["zumy"]
         start_tag = self.ar_tags["start"]
-        (trans, rot) = self.listener.lookupTransform(zumy_tag, start_tag, rospy.Time(0))
+        (trans, rot) = self.listener.lookupTransform(start_tag, zumy_tag, rospy.Time(0))
         euler = tf.transformations.euler_from_quaternion(rot)
         return (180/np.pi)*euler[2]
 
@@ -71,7 +71,7 @@ class MainControl:
     Keyword arguments:
     direction -- "left" or "right" [string]
     """
-    def turn(self, direction):
+    def turn(self, angle):
         # Create turn command
         cmd = Twist()
         cmd.linear.x = 0
@@ -79,21 +79,25 @@ class MainControl:
         cmd.linear.z = 0
         cmd.angular.x = 0
         cmd.angular.y = 0
-        if direction == "left":
-            cmd.angular.z = 0.2
-        elif direction == "right":
-            cmd.angular.z = -0.2
+        if angle > 0:
+            cmd.angular.z = 0.17
+            done = False
+        elif angle < 0:
+            cmd.angular.z = -0.17
+            done = False
+        else:
+            # 0 angle provided
+            done = True
 
-        done = False
         # Get current angle of Zumy relative to start
         current_angle = self.heading()
         while not rospy.is_shutdown() and not done:
             try:
                 # Get new angle of Zumy relative to start
                 new_angle = self.heading()
-                if abs(current_angle-new_angle) > 85:
+                if abs(current_angle-new_angle) > abs(angle)-5:
                     done = True
-                self.stop()
+                    self.stop()
                 else:
                     self.zumy_vel.publish(cmd)
                     self.rate.sleep()
@@ -107,7 +111,7 @@ class MainControl:
     def xyPos(self):
         zumy_tag = self.ar_tags["zumy"]
         start_tag = self.ar_tags["start"]
-        (trans, rot) = self.listener.lookupTransform(zumy_tag, start_tag, rospy.Time(0))
+        (trans, rot) = self.listener.lookupTransform(start_tag, zumy_tag, rospy.Time(0))
         xTrans = trans[0]
         yTrans = trans[1]
         return [xTrans, yTrans]
@@ -166,35 +170,30 @@ class MainControl:
     move the Zumy point by point until it has reached its current
     goal.
     """
-    # def moveToGoal(self):
-    #     while not rospy.is_shutdown() and not self.at_goal:
-        #     try:
-        #         ar_tags = self.ar_tags
-        #         zumy_tag = ar_tags["zumy"]
-        #         goal_tag = ar_tags[self.current_goal]
-        #         (trans, rot) = self.listener
-        #                            .lookupTransform(zumy_tag,
-        #                                             goal_tag,
-        #                                             rospy.Time(0))
-        #     except:
-        #         continue
-        #     rbt = self.return_rbt(trans, rot)
-        #     yTrans = -1*rbt[0, 3]
-        #     # Check if the y translation is less than some
-        #     # threshold
-        #     if abs(yTrans <= 0.15):
-        #         done = True
-        #     else:
-        #         cmd = Twist()
-        #         cmd.linear.x = 0
-        #         cmd.linear.y = 0
-        #         cmd.linear.z = 0
-        #         cmd.angular.x = 0
-        #         cmd.angular.y = 0
-        #         cmd.angular.z = 0.2
-        #         self.zumy_vel.publish(cmd)
-        #     self.rate.sleep()
-        # return
+    def moveToGoal(self):
+        i = 0
+        minError = 0.05;
+        path = self.path
+        # XXX handle origin case (10cm between centers of ar tags)
+        while not rospy.is_shutdown() and i < len(path):
+            nextPoint = path[i]
+            currPos = self.xyPos()
+            currHeading = self.heading()
+            
+            # Compare x values
+            dX = nextPoint[0] - currPos[0]
+            dY = nextPoint[1] - currPos[1]
+            if (abs(dX) > minError):
+                # Move in x direction
+                self.turn(-1*currHeading)
+                self.forward(dX)
+
+            if (abs(dY) > minError):
+                # Move in y direction
+                self.turn(90-currHeading)
+                self.forward(dY)
+            i = i + 1
+        return
 
     # def returnToStart(self):
     #     while not rospy.is_shutdown() and not self.at_goal:
@@ -204,15 +203,19 @@ class MainControl:
     #     self.current_goal = None
     #     return
 
+
     """ Main node execution function.
     """
     def run(self):
         while not rospy.is_shutdown() and not self.done:
             try:
+                # XXX testing stuff; remove later
                 self.wait_rate.sleep()
+                self.path = [[0.3, 0.3], [0.30, 0.4], [0.20, 0.4]]
                 direction = raw_input('How much should I go')
                 direction = raw_input('Sorry, what was that?')
-                self.forward(float(direction))
+                # self.forward(float(direction))
+                self.moveToGoal()
                 self.rate.sleep()
             except KeyboardInterrupt:
                 self.stop()
@@ -221,10 +224,10 @@ class MainControl:
         # service is set up in image_process.py and uses the UtensilSrv
         # service type.
         # rospy.wait_for_service("utensil_type")
-        # rospy.wait_for_service("path_planning")
+        rospy.wait_for_service("path_planning")
         # get_utensil_type = rospy.ServiceProxy("utensil_type", UtensilSrv)
-        # plan_path = rospy.ServiceProxy("plan_path", PathPlanningSrv)
-        # while not rospy.is_shutdown() and not self.done:
+        plan_path = rospy.ServiceProxy("plan_path", PathPlanningSrv)
+        while not rospy.is_shutdown() and not self.done:
             # XXX FUNCTION HERE TO DROP UTENSIL
             # Pause until the next utensil has dropped.
             # self.wait_rate.sleep()
