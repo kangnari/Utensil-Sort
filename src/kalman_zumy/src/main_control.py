@@ -40,21 +40,10 @@ class MainControl:
         self.current_goal = None
         # Set the current path for the zumy
         self.path = []
-        # True if Zumy has arrived at the current goal
-        self.at_goal = False
+        # True if Zumy is moving toward the origin
+        self.to_origin = False
         # True if Zumy has finished sorting all utensils
         self.done = False
-
-    """ Calculate the 4x4 rigid body transform from the
-    provided quarternions.
-
-    Keyword arguments:
-    trans -- the translation vector [3x1 array]
-    rot   -- the rotation vector (in quarternions) [4x1 array]
-    """
-    def return_rbt(self, trans, rot):
-        omega, theta = eqf.quarternion_to_exp(rot)
-        return eqf.create_rbt(omega, theta, trans)
 
     """ Returns zumy heading (angle from x axis, in degrees)
     """ 
@@ -65,13 +54,44 @@ class MainControl:
         euler = tf.transformations.euler_from_quaternion(rot)
         return (180/np.pi)*euler[2]
 
-    """ Turn the zumy 90 degrees in the appropriate
-    direction.
+    """ Turn the zumy to a certain angle.
     
     Keyword arguments:
-    direction -- "left" or "right" [string]
+    desired_angle -- angle zumy should turn to [number]
     """
-    def turn(self, angle):
+    def turn(self, desired_angle):
+        # Define parameters for applying variable speed
+        min_speed = 0.15
+        max_speed = 0.15
+        min_angle = 45
+        max_angle = 90
+        change_speed = (max_speed-min_speed) / (max_angle-min_angle)
+        offset = min_speed - change_speed * min_angle
+
+        # Get current angle of Zumy relative to start
+        current_angle = self.heading()
+
+        if desired_angle < 0:
+            desired_angle = desired_angle + 360
+        if current_angle < 0:
+            current_angle = current_angle + 360
+
+        # Determine which direction to turn
+        if desired_angle < current_angle:
+            if current_angle < desired_angle  + 180:
+                # Turn right
+                direction = -1
+            else:
+                # Turn left
+                direction = 1
+        else:
+            if desired_angle < current_angle + 180:
+                # Turn left
+                direction = 1
+            else:
+                # Turn right
+                direction = -1
+
         # Create turn command
         cmd = Twist()
         cmd.linear.x = 0
@@ -79,26 +99,21 @@ class MainControl:
         cmd.linear.z = 0
         cmd.angular.x = 0
         cmd.angular.y = 0
-        if angle > 0:
-            cmd.angular.z = 0.17
-            done = False
-        elif angle < 0:
-            cmd.angular.z = -0.17
-            done = False
-        else:
-            # 0 angle provided
-            done = True
+        done = False
 
-        # Get current angle of Zumy relative to start
-        current_angle = self.heading()
         while not rospy.is_shutdown() and not done:
             try:
                 # Get new angle of Zumy relative to start
                 new_angle = self.heading()
-                if abs(current_angle-new_angle) > abs(angle)-5:
+                if (new_angle < 0):
+                    new_angle = new_angle + 360
+                diff = abs(desired_angle - new_angle)
+                if diff < 5:
                     done = True
                     self.stop()
                 else:
+                    speed = min(max_speed, max(min_speed, offset+change_speed*diff))
+                    cmd.angular.z = direction * speed
                     self.zumy_vel.publish(cmd)
                     self.rate.sleep()
             except KeyboardInterrupt:
@@ -112,46 +127,51 @@ class MainControl:
         zumy_tag = self.ar_tags["zumy"]
         start_tag = self.ar_tags["start"]
         (trans, rot) = self.listener.lookupTransform(start_tag, zumy_tag, rospy.Time(0))
-        xTrans = trans[0]
-        yTrans = trans[1]
+        xTrans = trans[0]*100
+        yTrans = trans[1]*100
         return [xTrans, yTrans]
 
     """ Move the Zumy along the x- or y-axis for
     a given distance
 
     Keyword arguments:
-    amount -- amount to move by [0.1 -> 10cm]
+    amount -- amount to move by [cm]
     """
     def forward(self, amount):
-      cmd = Twist()
-      cmd.linear.y = 0
-      cmd.linear.z = 0
-      cmd.angular.x = 0
-      cmd.angular.y = 0
-      cmd.angular.z = 0
+        # Define parameters for applying variable speed
+        min_speed = 0.07
+        max_speed = 0.1
+        min_dist = 5
+        max_dist = 20
+        change_speed = (max_speed-min_speed) / (max_dist-min_dist)
+        offset = min_speed - change_speed * min_dist
 
-      if amount > 0:
-        cmd.linear.x = 0.1
-      else:
-        cmd.linear.x = -0.1
-        
-      done = False
-      #Get current position of Zumy relative to start(origin)
-      coor0 = self.xyPos()
-      while not rospy.is_shutdown() and not done:
-        try:
-            coor1 = self.xyPos()
-            dist = np.sqrt((coor1[0]-coor0[0])**2 + (coor1[1]-coor0[1])**2)
-            print dist
-            if (dist > abs(amount)):
-              done = True
-              self.stop()
-            else:
-              self.zumy_vel.publish(cmd)
-              self.rate.sleep()
-        except KeyboardInterrupt:
-            break
-      return
+        cmd = Twist()
+        cmd.linear.y = 0
+        cmd.linear.z = 0
+        cmd.angular.x = 0
+        cmd.angular.y = 0
+        cmd.angular.z = 0
+
+        done = False
+        #Get current position of Zumy relative to start(origin)
+        coor0 = self.xyPos()
+        while not rospy.is_shutdown() and not done:
+            try:
+                coor1 = self.xyPos()
+                dist = np.sqrt((coor1[0]-coor0[0])**2 + (coor1[1]-coor0[1])**2)
+                diff = dist-abs(amount)
+                if (diff < 1):
+                    done = True
+                    self.stop()
+                else:
+                    speed = min(max_speed, max(min_speed, offset+change_speed*diff))
+                    cmd.linear.x = np.sign(amount) * speed
+                    self.zumy_vel.publish(cmd)
+                    self.rate.sleep()
+            except KeyboardInterrupt:
+                break
+        return
 
     """ Stop Zumy movement.
     """
@@ -170,9 +190,13 @@ class MainControl:
     move the Zumy point by point until it has reached its current
     goal.
     """
+    """ Given a path output from the path planning service node,
+    move the Zumy point by point until it has reached its current
+    goal.
+    """
     def moveToGoal(self):
         i = 0
-        minError = 0.05;
+        minError = 2;
         path = self.path
         # XXX handle origin case (10cm between centers of ar tags)
         while not rospy.is_shutdown() and i < len(path):
@@ -182,26 +206,54 @@ class MainControl:
             
             # Compare x values
             dX = nextPoint[0] - currPos[0]
-            dY = nextPoint[1] - currPos[1]
-            if (abs(dX) > minError):
-                # Move in x direction
-                self.turn(-1*currHeading)
-                self.forward(dX)
+            
+            if self.to_origin:
+                # Moving toward origin
+                if (abs(dX) > minError):
+                    # Move in x direction
+                    if(dX > 0):
+                        self.turn(0)
+                    else:
+                        self.turn(180)
+                    self.forward(abs(dX))
 
-            if (abs(dY) > minError):
-                # Move in y direction
-                self.turn(90-currHeading)
-                self.forward(dY)
+                # Compuare y values
+                currPos = self.xyPos()
+                dY = nextPoint[1] - currPos[1]
+
+                if (abs(dY) > minError):
+                    # Move in y direction
+                    if (dY > 0):
+                        self.turn(90)
+                    else:
+                        self.turn(-90)
+                    self.forward(abs(dY))
+            else:
+                # Moving toward goal
+                if (abs(dX) > minError):
+                    # Move in x direction
+                    if(dX > 0):
+                        self.turn(180)
+                    else:
+                        self.turn(0)
+                    self.forward(-1*abs(dX))
+
+                # Compuare y values
+                currPos = self.xyPos()
+                dY = nextPoint[1] - currPos[1]
+                     
+                if (abs(dY) > minError):
+                    # Move in y direction
+                    if (dY > 0):
+                        self.turn(-90)
+                    else:
+                        self.turn(90)
+                    self.forward(-1*abs(dY))
             i = i + 1
+
+        # Toggle goal
+        self.to_origin = not self.to_origin
         return
-
-    # def returnToStart(self):
-    #     while not rospy.is_shutdown() and not self.at_goal:
-    #         self.rate.sleep()
-
-    #     self.path = []
-    #     self.current_goal = None
-    #     return
 
 
     """ Main node execution function.
@@ -211,10 +263,12 @@ class MainControl:
             try:
                 # XXX testing stuff; remove later
                 self.wait_rate.sleep()
-                self.path = [[0.3, 0.3], [0.30, 0.4], [0.20, 0.4]]
+                self.path = [[40, 0], [40, 40], [40, 60]]
                 direction = raw_input('How much should I go')
                 direction = raw_input('Sorry, what was that?')
                 # self.forward(float(direction))
+                self.moveToGoal()
+                self.path = self.path[::-1]
                 self.moveToGoal()
                 self.rate.sleep()
             except KeyboardInterrupt:
@@ -227,7 +281,7 @@ class MainControl:
         rospy.wait_for_service("path_planning")
         # get_utensil_type = rospy.ServiceProxy("utensil_type", UtensilSrv)
         plan_path = rospy.ServiceProxy("plan_path", PathPlanningSrv)
-        while not rospy.is_shutdown() and not self.done:
+        #while not rospy.is_shutdown() and not self.done:
             # XXX FUNCTION HERE TO DROP UTENSIL
             # Pause until the next utensil has dropped.
             # self.wait_rate.sleep()
